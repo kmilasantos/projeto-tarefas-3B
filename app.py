@@ -4,7 +4,6 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
-
 #configuração inicial
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -30,7 +29,7 @@ class User(db.Model, UserMixin):
 class Task(db.Model):
     id =  db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(150))
-    status = db.Column(db.String(20), default="Pedente")
+    status = db.Column(db.String(20), default="Pendente")
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 #------------------------------------
@@ -99,6 +98,52 @@ def logout():
 def tasks():
     user_tasks= Task.query.filter_by(user_id=current_user.id).all()
     return render_template('tasks.html', tasks=user_tasks)
+
+#Adicionar tarefa
+@app.route('/add_task', methods=['GET', 'POST'])
+@login_required
+def add_tasks():
+    if request.method == 'POST':
+        title = request.form['title']
+
+        new_task= Task(title=title, user_id=current_user.id)
+
+        db.session.add(new_task)
+        db.session.commit()
+
+        flash('Tarefa adicionada com sucesso!','success')
+        return redirect(url_for('tasks'))
+    
+    return render_template('add_tasks.html')
+
+#Atualizar status da tarefa - UPDATE
+@app.route('/update_task/<int:id>')
+@login_required
+def update_task(id):
+    task = Task.query.get_or_404(id)
+
+    if task.user_id != current_user.id:
+        flash ('Você não tem permissão para isso!', 'danger')
+        return redirect(url_for('tasks'))
+    
+    task.status = 'Concluída' if task.status == 'Pendente' else "Pendente"
+    db.session.commit()
+    return redirect(url_for('tasks'))
+
+#Deletar tarefa -- DELETE
+@app.route('/delete_task/<int:id>')
+@login_required
+def delete_task(id):
+    task = Task.query.get_or_404(id)
+
+    if task.user_id != current_user.id:
+        flash('Você não tem permissão para isso!', 'danger')
+        return redirect(url_for('tasks'))
+    
+    db.session.delete(task)
+    db.session.commit()
+    flash('Tarefa excluida com sucesso!', 'info')
+    return redirect(url_for('tasks'))
 
 #--------------------------------
 # CRIAR BANCO NA PRIMEIRA EXECUÇÃO
